@@ -8,6 +8,7 @@ import java.util.List;
 import java.io.FileWriter;
 
 public class JsonFormatter {
+
     private List<String> sightsJson;
     private Gson gson;
 
@@ -34,5 +35,6 @@ public class JsonFormatter {
             e.printStackTrace();
         }
     }
+
 }
 
