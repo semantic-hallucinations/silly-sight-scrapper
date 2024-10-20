@@ -1,15 +1,14 @@
 package com.hohich;
 
-import org.openqa.selenium.By;
-import org.openqa.selenium.JavascriptExecutor;
-import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.WebElement;
+import org.openqa.selenium.*;
 import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
 import java.time.Duration;
 import java.util.*;
+import java.util.NoSuchElementException;
 
 public class Scrapper {
     private WebDriver driver;
@@ -17,7 +16,14 @@ public class Scrapper {
     private String path;
 
     public Scrapper() {
-        driver = new ChromeDriver();
+        ChromeOptions options = new ChromeOptions();
+        options.addArguments("--headless");
+        options.addArguments("--no-sandbox");
+        options.addArguments("--disable-dev-shm-usage");
+        options.addArguments("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)" +
+                " AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124");
+
+        driver = new ChromeDriver(options);
         sights = new ArrayList<>();
         path = "https://yandex.by/maps";
     }
@@ -28,21 +34,16 @@ public class Scrapper {
 
     public void scrap(String region, String sightClass) throws NoSuchElementException {
         driver.get(path);
-        driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(20));
+        driver.manage()
+                .timeouts()
+                .implicitlyWait(Duration.ofSeconds(20));
+
         searchRequest(region, sightClass);
-
-        //дописать код для прокрутки страницы
-        //потому что 4 пивнухи нам недостаточно
-
-        WebElement sideBarList = driver.findElement(By.className("search-list-view__list"));
-        for (WebElement element : sideBarList.findElements(By.tagName("li"))) {
-            Sight sight = scrapSight(element);
-            System.out.println(sight.toString());
-            sights.add(sight);
-        }
+        scrollFeed();
 
         driver.quit();
     }
+
 
     private void searchRequest(String place, String type) throws NoSuchElementException {
         WebElement inputField = driver.findElement(
@@ -52,6 +53,53 @@ public class Scrapper {
         WebElement searchButton = driver.findElement(
                 By.xpath("//div[@class='small-search-form-view__button']/button"));
         searchButton.click();
+    }
+
+    private void scrollFeed() {
+        JavascriptExecutor js = (JavascriptExecutor) driver;
+        WebElement sideBarList = driver.findElement(By.className("search-list-view__list"));
+        Set<String> processedElements = new HashSet<>();
+
+        boolean loadMore = true;
+
+        while (loadMore) {
+            //обработка видимых элементов
+            List<WebElement> visibleElements = sideBarList.findElements(By.tagName("li"));
+            if(visibleElements.size() == 0) {
+                System.out.println("Nothing was found");
+                return;
+            }
+            for (WebElement element : visibleElements) {
+                String elementText = element.getText();
+
+                if (processedElements.contains(elementText)) {
+                    continue;
+                }
+                //записали в структуру для дальнейшей обработки полей
+                Sight sight = scrapSight(element);
+                System.out.println(sight.toString());
+                sights.add(sight);
+                processedElements.add(elementText); //запомнили уникальные элементы
+            }
+
+            try {
+                //скроллим
+                WebElement scrolledEl = driver.findElement(By.className("scroll__container"));
+                js.executeScript("arguments[0].scrollTop = arguments[0].scrollHeight", scrolledEl);
+                //ждём
+                WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(20));
+                wait.until(driver -> sideBarList.findElements(By.tagName("li")).size() > visibleElements.size());
+
+            } catch (TimeoutException e) {
+                System.out.println("I've done! No more sights left!");
+
+            } finally {
+                List<WebElement> newVisibleElements = sideBarList.findElements(By.tagName("li"));
+                if (newVisibleElements.size() == processedElements.size()) {
+                    loadMore = false; //если ничего нового не подгрузилось - сворачиваем лавочку
+                }
+            }
+        }
     }
 
     private Sight scrapSight(WebElement sightWeb) {
