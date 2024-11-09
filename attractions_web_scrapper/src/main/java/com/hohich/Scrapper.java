@@ -35,7 +35,7 @@ public class Scrapper {
         return Collections.unmodifiableList(sights);
     }
 
-    public void scrap(String region, String sightClass) throws NoSuchElementException {
+    public void scrap(String region, String sightClass) {
         driver.get(path);
         driver.manage()
                 .timeouts()
@@ -43,7 +43,7 @@ public class Scrapper {
         try{
             searchRequest(region, sightClass);
             scrollFeed();
-        } catch (Exception e) {
+        } catch (TimeoutException e) {
             System.out.println(e);
         }finally{
             driver.quit();
@@ -61,8 +61,7 @@ public class Scrapper {
                     By.xpath("//div[@class='small-search-form-view__button']/button")));
             searchButton.click();
         } catch (TimeoutException e) {
-            System.out.println("Input field not found. Time out exceed");
-            throw new TimeoutException(e);
+            throw new TimeoutException("Input field not found. Time out exceed");
         }
     }
 
@@ -74,8 +73,7 @@ public class Scrapper {
             sideBarList = wait.until(ExpectedConditions.visibilityOfElementLocated(
                     By.className("search-list-view__list")));
         } catch (TimeoutException e) {
-            System.out.println("Sigths list not found. Time out exceed");
-            throw new TimeoutException(e);
+            throw new TimeoutException("Sigths list not found. Time out exceed");
         }
 
         Set<String> processedElements = new HashSet<>();
