@@ -8,7 +8,6 @@ import java.util.List;
 import java.io.FileWriter;
 
 public class JsonFormatter {
-
     private List<String> sightsJson;
     private Gson gson;
 
@@ -29,12 +28,13 @@ public class JsonFormatter {
     }
 
     private void writeToFile(String region, String sightClass){
-        try(FileWriter writer = new FileWriter(region+""+sightClass+".json")){
+        try(FileWriter writer = new FileWriter(region.replaceAll(" ","")+""+
+                sightClass.replaceAll(" ","")+".json")){
             writer.write(gson.toJson(sightsJson));
         }catch (IOException e){
             e.printStackTrace();
         }
     }
-
 }
+
 

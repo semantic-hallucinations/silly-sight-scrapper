@@ -1,19 +1,22 @@
 package com.hohich;
 
 import org.openqa.selenium.*;
+import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
+import java.sql.Time;
 import java.time.Duration;
 import java.util.*;
-import java.util.NoSuchElementException;
 
 public class Scrapper {
     private WebDriver driver;
     private List<Sight> sights;
     private String path;
+    private String sightClass;
+    private String region;
 
     public Scrapper() {
         ChromeOptions options = new ChromeOptions();
@@ -36,42 +39,57 @@ public class Scrapper {
         driver.get(path);
         driver.manage()
                 .timeouts()
-                .implicitlyWait(Duration.ofSeconds(20));
-
-        searchRequest(region, sightClass);
-        scrollFeed();
-
-        driver.quit();
+                .implicitlyWait(Duration.ofSeconds(3));
+        try{
+            searchRequest(region, sightClass);
+            scrollFeed();
+        } catch (Exception e) {
+            System.out.println(e);
+        }finally{
+            driver.quit();
+        }
     }
 
+    private void searchRequest(String place, String type) throws TimeoutException {
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
+        try{
+            WebElement inputField = wait.until(ExpectedConditions.visibilityOfElementLocated(
+                    By.xpath("//span[@class='input__context']/input")));
+            inputField.sendKeys(place + " " + type);
 
-    private void searchRequest(String place, String type) throws NoSuchElementException {
-        WebElement inputField = driver.findElement(
-                By.xpath("//span[@class='input__context']/input"));
-        inputField.sendKeys(place + " " + type);
-
-        WebElement searchButton = driver.findElement(
-                By.xpath("//div[@class='small-search-form-view__button']/button"));
-        searchButton.click();
+            WebElement searchButton = wait.until(ExpectedConditions.elementToBeClickable(
+                    By.xpath("//div[@class='small-search-form-view__button']/button")));
+            searchButton.click();
+        } catch (TimeoutException e) {
+            System.out.println("Input field not found. Time out exceed");
+            throw new TimeoutException(e);
+        }
     }
 
-    private void scrollFeed() {
+    private void scrollFeed() throws TimeoutException{
         JavascriptExecutor js = (JavascriptExecutor) driver;
-        WebElement sideBarList = driver.findElement(By.className("search-list-view__list"));
-        Set<String> processedElements = new HashSet<>();
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(20));
+        WebElement sideBarList;
+        try {
+            sideBarList = wait.until(ExpectedConditions.visibilityOfElementLocated(
+                    By.className("search-list-view__list")));
+        } catch (TimeoutException e) {
+            System.out.println("Sigths list not found. Time out exceed");
+            throw new TimeoutException(e);
+        }
 
+        Set<String> processedElements = new HashSet<>();
         boolean loadMore = true;
 
         while (loadMore) {
             //обработка видимых элементов
             List<WebElement> visibleElements = sideBarList.findElements(By.tagName("li"));
             if(visibleElements.size() == 0) {
-                System.out.println("Nothing was found");
+                System.out.println("No sights of was found");
                 return;
             }
             for (WebElement element : visibleElements) {
                 String elementText = element.getText();
-
                 if (processedElements.contains(elementText)) {
                     continue;
                 }
@@ -87,31 +105,60 @@ public class Scrapper {
                 WebElement scrolledEl = driver.findElement(By.className("scroll__container"));
                 js.executeScript("arguments[0].scrollTop = arguments[0].scrollHeight", scrolledEl);
                 //ждём
-                WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(20));
-                wait.until(driver -> sideBarList.findElements(By.tagName("li")).size() > visibleElements.size());
-
+                wait.until(driver -> sideBarList.findElements(By.tagName("li")).size()
+                        > visibleElements.size());
             } catch (TimeoutException e) {
                 System.out.println("I've done! No more sights left!");
-
+                loadMore = false;
             } finally {
-                List<WebElement> newVisibleElements = sideBarList.findElements(By.tagName("li"));
-                if (newVisibleElements.size() == processedElements.size()) {
-                    loadMore = false; //если ничего нового не подгрузилось - сворачиваем лавочку
+                if (loadMore) { // Проверяем только если цикл не остановлен
+                    List<WebElement> newVisibleElements = sideBarList.findElements(By.tagName("li"));
+                    if (newVisibleElements.size() == processedElements.size()) {
+                        loadMore = false; // Прерываем, если не загрузилось ничего нового
+                    }
                 }
             }
         }
     }
 
     private Sight scrapSight(WebElement sightWeb) {
-        WebElement snippet = sightWeb.findElement(
-                By.className("search-business-snippet-view__content"));
-        String sightName = snippet.findElement(
-                By.className("search-business-snippet-view__title")).getText();
-        String address = snippet.findElement(
-                By.className("search-business-snippet-view__address")).getText();
-        String url = sightWeb.findElement(
-                By.className("link-overlay")).getAttribute("href");
-        return new Sight(sightName, address, url);
+        String sightName = "null", address = "null", url = "null";
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(5));
+
+        try {
+            // Ожидание появления контейнера snippet
+            WebElement snippet = wait.until(
+                    ExpectedConditions.visibilityOf(sightWeb.findElement(
+                            By.className("search-business-snippet-view__content")))
+            );
+
+            try {
+                address = snippet.findElement(
+                        By.className("search-business-snippet-view__address")).getText();
+            } catch (org.openqa.selenium.NoSuchElementException e) {
+                System.out.println("Address not found for this sight.");
+
+            }
+
+            try {
+                sightName = snippet.findElement(
+                        By.className("search-business-snippet-view__title")).getText();
+            } catch (org.openqa.selenium.NoSuchElementException e) {
+                System.out.println("Sight name not found for this sight.");
+            }
+
+            try {
+                url = sightWeb.findElement(
+                        By.className("link-overlay")).getAttribute("href");
+            } catch (org.openqa.selenium.NoSuchElementException e) {
+                System.out.println("URL not found for this sight.");
+            }
+
+        } catch (TimeoutException e) {
+            System.out.println("Snippet container didn't load in time.");
+        } finally {
+            return new Sight(sightName, address, url);
+        }
     }
 
     static class Sight {
