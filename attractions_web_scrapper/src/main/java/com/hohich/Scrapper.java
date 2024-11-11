@@ -15,8 +15,7 @@ public class Scrapper {
     private WebDriver driver;
     private List<Sight> sights;
     private String path;
-    private String sightClass;
-    private String region;
+
 
     public Scrapper() {
         ChromeOptions options = new ChromeOptions();
