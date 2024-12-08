@@ -4,9 +4,13 @@ import org.openqa.selenium.*;
 import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
+import org.openqa.selenium.remote.DesiredCapabilities;
+import org.openqa.selenium.remote.RemoteWebDriver;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.sql.Time;
 import java.time.Duration;
 import java.util.*;
@@ -17,15 +21,17 @@ public class Scrapper {
     private String path;
 
 
-    public Scrapper() {
-        ChromeOptions options = new ChromeOptions();
-        options.addArguments("--headless");
-        options.addArguments("--no-sandbox");
-        options.addArguments("--disable-dev-shm-usage");
-        options.addArguments("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)" +
-                " AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124");
+    public Scrapper() throws MalformedURLException {
+        URL gridUrl = new URL("http://chrome:4444/wd/hub");
 
-        driver = new ChromeDriver(options);
+        // Настраиваем браузер
+        DesiredCapabilities capabilities = new DesiredCapabilities();
+        capabilities.setBrowserName("chrome");
+        capabilities.setCapability("platformName", "LINUX");
+
+        // Создаем удаленный драйвер
+        this.driver = new RemoteWebDriver(gridUrl, capabilities);
+
         sights = new ArrayList<>();
         path = "https://yandex.by/maps";
     }
