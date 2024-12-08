@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  scraper:
+    build:
+      context: .
+    depends_on:
+      chrome:
+        condition: service_healthy
+    volumes:
+      - ./output:/app/data
+    environment:
+      - SELENIUM_HOST=http://chrome:4444/wd/hub
+    networks:
+      - scrapper_network
+
+  chrome:
+    image: selenium/standalone-chrome:latest
+    shm_size: 2gb
+    ports:
+      - "4444:4444"
+    networks:
+      - scrapper_network
+    environment:
+      - SE_ENABLE_TRACING=false
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:4444 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+networks:
+  scrapper_network:
+    driver: bridge
+
